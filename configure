@@ -1,0 +1,223 @@
+#!/bin/bash
+
+# Assume that all subscripts are located in the same directory as this script
+path=$(dirname $(readlink -f $0))
+
+read_path() {
+    str=$1
+    var=$2
+    read -e -p "$str" $var 
+    # replace ~ for $HOME as "tilde expansion" does not work for read().
+    # http://www.gnu.org/software/bash/manual/bashref.html#Tilde-Expansion
+    # Known limitation: only input where ~ as a replacement for $HOME works
+    #                   not the other variants: ~fred/foo, ~+/foo, ~-/foo, ~N, ~+N, ~-N 
+    # The extra ! is a bash4 spcific and adds an extra level of indirection
+    eval $var=${!var/#\~/$HOME}
+}
+
+get_encrypt_path() {
+    read_path "Path to the root of the encrypted filesystem: " encrypt_path
+    if ! [ -d $encrypt_path ]; then
+        echo "ERROR: The directory '$encrypt_path' is not found. Try again."
+        get_encrypt_path
+    fi
+}
+
+get_decrypt_path() {
+    read_path "Path to the decrypted mount point: " decrypt_path
+    if ! [ -d $decrypt_path ]; then
+        while : ; do
+            read -p "The direcory '$decrypt_path' does not exist. Create it? [N/y]: " -n 1 create_dir
+            if [[ -z "$create_dir" ]] || [[ "$create_dir" =~ [N,n,Y,y] ]]; then
+                echo ""
+                break
+            fi
+        done
+        if [[ -z "$create_dir" ]] || [[ "$create_dir" =~ [N,n] ]]; then
+            get_decrypt_path
+        elif [[ "$create_it" == [Y,y] ]]; then
+            # path creation is postponed to simplify cleanup
+            :
+        else:
+            # Classic: "This should never happen" ;)
+            echo "ERROR: Parser logic bug. Abort."
+            exit 1
+        fi
+    fi
+    
+    if ! [ -d $decrypt_path ]; then
+        mkdir -p $decrypt_path
+        if [ "$?" -ne 0 ]; then
+            sudo -k mkdir -p $decrypt_path
+        fi
+    fi
+}
+
+get_passphrase() {
+    read -p "The passphrase for decrypting: " ecryptfs_passphrase
+}
+
+get_configuration_id() {
+    read -p "The id for this configuration will be [$(basename $decrypt_path)]:" conf_id
+    if [ -z "$config_id" ]; then
+        conf_id=$(basename $decrypt_path)
+    fi
+}
+
+get_gendsession() {
+    gendsession_path=$path/gendsession
+    if ! [ -d $gendsession_path ]; then
+        git clone https://github.com/backloop/gendsession.git
+        if (( $? != 0 )); then
+            echo "Error occurred while downloading gendsession helper. Abort."
+            exit 1
+        fi
+    fi
+}
+
+configure () {
+    # Config file is used by the mounting script
+    conffile=~/.automount-$conf_id.conf
+    touch $conffile
+    chmod 600 $conffile
+    cat << EOF >> $conffile
+encrypt_path=$encrypt_path
+decrypt_path=$decrypt_path
+EOF
+    echo "Created '$conffile'"
+    
+    # Keeping the passwd file separate for easy use of mount command
+    passwdfile=~/.automount-$conf_id.ecryptfs
+    touch $passwdfile
+    chmod 600 $passwdfile
+    cat << EOF >> $passwdfile
+passwd=$ecryptfs_passphrase
+EOF
+    echo "Created '$passwdfile'"
+    
+    # Create wrapper script that is autostarted at login
+    cmdfile=~/automount-$conf_id.sh
+    touch $cmdfile
+    chmod 700 $cmdfile
+    cat << EOF >> $cmdfile
+#!/bin/sh
+
+# These actions will be executed during login
+$path/mount-ecryptfs.sh ~/.automount-$conf_id.conf ~/.automount-$conf_id.ecryptfs
+
+# This starts a listener for logout signalling and executes the actions during logout
+$gendsession_path/gendsession.py $path/umount-ecryptfs.sh ~/.automount-$conf_id.conf
+EOF
+    echo "Created '$cmdfile'"
+    
+    # Allow execution of some commands without asking for password 
+    sudoersfile=/etc/sudoers.d/01_automount-$conf_id
+    sudo -k tee $sudoersfile > /dev/null << EOF
+$USER ALL=NOPASSWD:/bin/mount -t ecryptfs $encrypt_path $decrypt_path *,/bin/umount $decrypt_path,/usr/bin/ecryptfs-add-passphrase --fnek
+EOF
+    echo "Created '$sudoersfile'"
+    
+    # create .desktop file for Startup Applications
+    #http://askubuntu.com/questions/63407/where-are-startup-commands-stored
+    autostartfile=~/.config/autostart/automount-$conf_id.desktop
+    cat << EOF >> $autostartfile
+[Desktop Entry]
+Type=Application
+Exec=$HOME/automount-$conf_id.sh
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name[en_US]=Automount eCryptfs '$conf_id' configuration
+Name=Automount eCryptfs '$conf_id' configuration
+Comment[en_US]=Decrypted filesystem available at '$decrypt_path'
+Comment=Decrypted filesystem available at '$decrypt_path'
+EOF
+    echo "Created '$autostartfile'"
+}
+
+deconfigure() {
+    conffile=~/.automount-$conf_id.conf
+    if [ -e $conffile ]; then
+        rm $conffile
+        echo "Removed '$conffile'"
+    fi
+    
+    passwdfile=~/.automount-$conf_id.ecryptfs
+    if [ -e $passwdfile ]; then
+        rm $passwdfile
+        echo "Removed '$passwdfile'"
+    fi
+    
+    cmdfile=~/automount-$conf_id.sh
+    if [ -e $cmdfile ]; then
+        rm $cmdfile
+        echo "Removed '$cmdfile'"
+    fi
+    
+    sudoersfile=/etc/sudoers.d/01_automount-$conf_id
+    if [ -e $sudoersfile ]; then
+        sudo -k rm $sudoersfile
+        echo "Removed '$sudoersfile'"
+    fi
+    
+    autostartfile=~/.config/autostart/automount-$conf_id.desktop
+    if [ -e $autostartfile ]; then
+        rm $autostartfile
+        echo "Removed '$autostartfile'"
+    fi
+
+    echo "Done."
+}
+
+usage() {
+    echo ""
+    echo "Usage: $0 [-d conf_id]"
+    echo ""
+    exit 1
+}
+
+#
+# Main
+#
+if (( $# == 2 )); then
+    if [ "$1" == "-d" ]; then
+        conf_id=$2
+        deconfigure
+    else
+        usage
+    fi
+elif (( $# == 1 )); then
+    if [ "$1" == "-h" ]; then
+        usage
+    else
+        usage
+    fi
+   # currently does not matter if -h or other option
+    usage
+elif (( $# == 0 )); then
+    get_encrypt_path
+    get_decrypt_path
+    get_passphrase
+    get_configuration_id
+    
+    # register handler when we have enough info and before 
+    # we're creating objects outside this directory
+    trap deconfigure SIGHUP SIGINT SIGQUIT SIGTERM SIGTSTP
+    
+    get_gendsession
+    configure
+    
+    echo ""
+    echo "################################################################################"
+    echo "# NOTE:                                                                      #"
+    echo "# Execution of other Startup Applications that depend on the existence of the  #"
+    echo "# decrypted filesystem need to be delayed. Please add the following to those   #"
+    echo "# Startup Applications' command line:                                          #"
+    echo "#                                                                              #"
+    echo "     bash -c \"while ! mount | grep $decrypt_path; do sleep 2; done; <original command>\"" 
+    echo "#                                                                              #"
+    echo "################################################################################"
+    echo "Done."
+else
+    usage
+fi
