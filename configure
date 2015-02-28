@@ -209,7 +209,7 @@ elif (( $# == 0 )); then
     
     # register handler when we have enough info and before 
     # we're creating objects outside this directory
-    trap deconfigure SIGHUP SIGINT SIGQUIT SIGTERM SIGTSTP
+    trap "deconfigure; exit 1" SIGHUP SIGINT SIGQUIT SIGTERM SIGTSTP
     
     get_gendsession
     configure
