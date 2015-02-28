@@ -7,6 +7,11 @@
 # copy at http://opensource.org/licenses/MIT)
 # 
 
+if (( $(echo $BASH_VERSION | cut -d '.' -f1) < 4)); then 
+    echo "This script requires BASH 4.x or later to work properly. Abort."
+    exit 1
+fi
+
 # Assume that all subscripts are located in the same directory as this script
 path=$(dirname $(readlink -f $0))
 
@@ -18,7 +23,7 @@ read_path() {
     # http://www.gnu.org/software/bash/manual/bashref.html#Tilde-Expansion
     # Known limitation: only input where ~ as a replacement for $HOME works
     #                   not the other variants: ~fred/foo, ~+/foo, ~-/foo, ~N, ~+N, ~-N 
-    # The extra ! is a bash4 spcific and adds an extra level of indirection
+    # The extra ! is a bash4 specific and adds an extra level of indirection
     eval $var=${!var/#\~/$HOME}
 }
 
@@ -35,28 +40,28 @@ get_decrypt_path() {
     if ! [ -d $decrypt_path ]; then
         while : ; do
             read -p "The direcory '$decrypt_path' does not exist. Create it? [N/y]: " -n 1 create_dir
-            if [[ -z "$create_dir" ]] || [[ "$create_dir" =~ [N,n,Y,y] ]]; then
-                echo ""
-                break
-            fi
+            case "$create_dir" in
+                [Yy]* )
+                        echo ""
+                        mkdir -p $decrypt_path
+                        if [ "$?" -ne 0 ]; then
+                            sudo -k mkdir -p $decrypt_path
+                        fi
+                        break
+                        ;;
+                [Nn]* )
+                        echo ""
+                        ;& #fall through construct for bash4
+                "" )
+                        get_decrypt_path
+                        break
+                        ;;
+                * )
+                        # unsupported character, try again.
+                        echo ""
+                        ;;
+            esac
         done
-        if [[ -z "$create_dir" ]] || [[ "$create_dir" =~ [N,n] ]]; then
-            get_decrypt_path
-        elif [[ "$create_it" == [Y,y] ]]; then
-            # path creation is postponed to simplify cleanup
-            :
-        else:
-            # Classic: "This should never happen" ;)
-            echo "ERROR: Parser logic bug. Abort."
-            exit 1
-        fi
-    fi
-    
-    if ! [ -d $decrypt_path ]; then
-        mkdir -p $decrypt_path
-        if [ "$?" -ne 0 ]; then
-            sudo -k mkdir -p $decrypt_path
-        fi
     fi
 }
 
