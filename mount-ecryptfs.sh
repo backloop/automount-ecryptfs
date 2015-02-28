@@ -1,6 +1,11 @@
 #!/bin/bash -x
 
-# PRIVACY NOTE: use "activity log manager" to control which history zeitgeist stores (opened files, online searches)
+# 
+# Copyright (c) 2015 Pablo Cases, 
+# Distributed under the MIT License.
+# (See accompanying file LICENSE file or 
+# copy at http://opensource.org/licenses/MIT)
+# 
 
 if (( $# !=2 )); then
     echo "Usage: $0 <automount-config-file> <automount-passphrase-file>"
