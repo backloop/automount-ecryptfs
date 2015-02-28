@@ -7,12 +7,22 @@ The purpose of automount-ecryptfs is to automatically mount/umount ecryptfs encr
 
 Currently, these tools assume that the ecryptfs filesystem has already been created and that the passphrase is available. 
 
+The tools create the following files, where \<conf_id\> is an identifier chosen by the user during initial configuration:
+
+| File | Comment |
+| ---- | ------- |
+| ~/.automount-\<conf_id\>.conf | Contains the configuration metadata; e.g.mount locations |
+| ~/.automount-\<conf_id\>.ecryptfs | Maintains the ecryptfs passphrase separately for easy parsing |
+| ~/automount-\<conf_id\>.sh | The script executed by the Startup Applications functionality |
+| ~/.config/autostart/automount-\<conf_id\>.desktop | Programmatically adding an application to Startup Applications |
+| /etc/sudoers.d/01_automount-\<conf-id\> | Allow unattended execution of restricted commands, e.g. mount/umount |
+
 ##Usage
 ### Initial configuration
 `$ ./configure`
 
 ### Removal of configuration files
-`$ ./configure -d <configuration_id>`
+`$ ./configure -d <conf_id>`
 
 ##Supported Platforms
 All Gnome based systems should be supported. Verified on:
