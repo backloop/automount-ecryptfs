@@ -77,9 +77,11 @@ get_configuration_id() {
 }
 
 get_gendsession() {
-    gendsession_path=$path/gendsession
+    version="1.0"
+    tagname="v$version"
+    gendsession_path=$path/gendsession-$version
     if ! [ -d $gendsession_path ]; then
-        git clone https://github.com/backloop/gendsession.git
+        wget -q https://github.com/backloop/gendsession/archive/${tagname}.tar.gz && tar -xf ${tagname}.tar.gz && rm ${tagname}.tar.gz
         if (( $? != 0 )); then
             echo "Error occurred while downloading gendsession helper. Abort."
             exit 1
