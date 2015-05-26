@@ -127,7 +127,7 @@ EOF
     # Allow execution of some commands without asking for password 
     sudoersfile=/etc/sudoers.d/01_automount-$conf_id
     sudo -k tee $sudoersfile > /dev/null << EOF
-$USER ALL=NOPASSWD:/bin/mount -t ecryptfs $encrypt_path $decrypt_path *,/bin/umount $decrypt_path,/usr/bin/ecryptfs-add-passphrase --fnek
+$USER ALL=NOPASSWD:/bin/mount -t ecryptfs $encrypt_path $decrypt_path *,/bin/umount $decrypt_path
 EOF
     echo "Created '$sudoersfile'"
     
