@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# 
-# Copyright (c) 2015 Pablo Cases, 
+#
+# Copyright (c) 2015-2020 Pablo Cases,
 # Distributed under the MIT License.
-# (See accompanying file LICENSE file or 
+# (See accompanying file LICENSE file or
 # copy at http://opensource.org/licenses/MIT)
-# 
+#
 
-if (( $(echo $BASH_VERSION | cut -d '.' -f1) < 4)); then 
+if (( $(echo $BASH_VERSION | cut -d '.' -f1) < 4)); then
     echo "This script requires BASH 4.x or later to work properly. Abort."
     exit 1
 fi
@@ -18,11 +18,11 @@ path=$(dirname $(readlink -f $0))
 read_path() {
     str=$1
     var=$2
-    read -e -p "$str" $var 
+    read -e -p "$str" $var
     # replace ~ for $HOME as "tilde expansion" does not work for read().
     # http://www.gnu.org/software/bash/manual/bashref.html#Tilde-Expansion
     # Known limitation: only input where ~ as a replacement for $HOME works
-    #                   not the other variants: ~fred/foo, ~+/foo, ~-/foo, ~N, ~+N, ~-N 
+    #                   not the other variants: ~fred/foo, ~+/foo, ~-/foo, ~N, ~+N, ~-N
     # The extra ! is a bash4 specific and adds an extra level of indirection
     eval $var=${!var/#\~/$HOME}
 }
@@ -77,7 +77,7 @@ get_configuration_id() {
 }
 
 get_gendsession() {
-    version="1.0"
+    version="1.1"
     tagname="v$version"
     gendsession_path=$path/gendsession-$version
     if ! [ -d $gendsession_path ]; then
@@ -99,7 +99,7 @@ encrypt_path=$encrypt_path
 decrypt_path=$decrypt_path
 EOF
     echo "Created '$conffile'"
-    
+
     # Keeping the passwd file separate for easy use of mount command
     passwdfile=~/.automount-$conf_id.ecryptfs
     touch $passwdfile
@@ -108,7 +108,7 @@ EOF
 passwd=$ecryptfs_passphrase
 EOF
     echo "Created '$passwdfile'"
-    
+
     # Create wrapper script that is autostarted at login
     cmdfile=~/automount-$conf_id.sh
     touch $cmdfile
@@ -123,14 +123,14 @@ $path/mount-ecryptfs.sh ~/.automount-$conf_id.conf ~/.automount-$conf_id.ecryptf
 $gendsession_path/gendsession.py $path/umount-ecryptfs.sh ~/.automount-$conf_id.conf
 EOF
     echo "Created '$cmdfile'"
-    
-    # Allow execution of some commands without asking for password 
+
+    # Allow execution of some commands without asking for password
     sudoersfile=/etc/sudoers.d/01_automount-$conf_id
     sudo -k tee $sudoersfile > /dev/null << EOF
 $USER ALL=NOPASSWD:/bin/mount -t ecryptfs $encrypt_path $decrypt_path *,/bin/umount $decrypt_path,/usr/bin/ecryptfs-add-passphrase --fnek
 EOF
     echo "Created '$sudoersfile'"
-    
+
     # create .desktop file for Startup Applications
     #http://askubuntu.com/questions/63407/where-are-startup-commands-stored
     autostartfile=~/.config/autostart/automount-$conf_id.desktop
@@ -155,25 +155,25 @@ deconfigure() {
         rm $conffile
         echo "Removed '$conffile'"
     fi
-    
+
     passwdfile=~/.automount-$conf_id.ecryptfs
     if [ -e $passwdfile ]; then
         rm $passwdfile
         echo "Removed '$passwdfile'"
     fi
-    
+
     cmdfile=~/automount-$conf_id.sh
     if [ -e $cmdfile ]; then
         rm $cmdfile
         echo "Removed '$cmdfile'"
     fi
-    
+
     sudoersfile=/etc/sudoers.d/01_automount-$conf_id
     if [ -e $sudoersfile ]; then
         sudo -k rm $sudoersfile
         echo "Removed '$sudoersfile'"
     fi
-    
+
     autostartfile=~/.config/autostart/automount-$conf_id.desktop
     if [ -e $autostartfile ]; then
         rm $autostartfile
@@ -213,14 +213,14 @@ elif (( $# == 0 )); then
     get_decrypt_path
     get_passphrase
     get_configuration_id
-    
-    # register handler when we have enough info and before 
+
+    # register handler when we have enough info and before
     # we're creating objects outside this directory
     trap "deconfigure; exit 1" SIGHUP SIGINT SIGQUIT SIGTERM SIGTSTP
-    
+
     get_gendsession
     configure
-    
+
     echo ""
     echo "################################################################################"
     echo "# NOTE:                                                                      #"
@@ -228,7 +228,7 @@ elif (( $# == 0 )); then
     echo "# decrypted filesystem need to be delayed. Please add the following to those   #"
     echo "# Startup Applications' command line:                                          #"
     echo "#                                                                              #"
-    echo "     bash -c \"while ! mount | grep $decrypt_path; do sleep 2; done; <original command>\"" 
+    echo "     bash -c \"while ! mount | grep $decrypt_path; do sleep 2; done; <original command>\""
     echo "#                                                                              #"
     echo "################################################################################"
     echo "Done."
