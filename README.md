@@ -26,4 +26,4 @@ The tools create the following files, where \<conf_id\> is an identifier chosen 
 
 ## Supported Platforms
 All Gnome based systems should be supported. Verified on:
-* Ubuntu 14.10 through to 17.04
+* Ubuntu 14.10 through to 17.04 and 19.10
